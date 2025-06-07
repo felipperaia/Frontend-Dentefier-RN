@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// src/screens/ListaEvidencias.tsx
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,73 +11,80 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { useNavigation, useFocusEffect, NavigationProp } from '@react-navigation/native';
+import { getEvidencias, deleteEvidencia, updateEvidencia } from '../services/evidencias';
 
 type Evidencia = {
-  id: string;
-  imagem: string;
+  _id: string;
+  imagemUrl: string;
   descricao: string;
   tipo: string;
   dataColeta: string;
-  responsavel: string;
+  responsavelColeta: string;
 };
 
-export default function Evidencias() {
-  const [evidencias, setEvidencias] = useState<Evidencia[]>([
-    {
-      id: '1',
-      imagem: 'https://via.placeholder.com/150',
-      descricao: 'Evidência 1',
-      tipo: 'Fotográfica',
-      dataColeta: '05/06/2025',
-      responsavel: 'João Silva',
-    },
-    {
-      id: '2',
-      imagem: 'https://via.placeholder.com/150',
-      descricao: 'Evidência 2',
-      tipo: 'Documental',
-      dataColeta: '04/06/2025',
-      responsavel: 'Maria Oliveira',
-    },
-  ]);
+export type MainAppStackParamList = {
+  ListaEvidencias: undefined;
+  CadastroEvidencia: undefined;
+};
 
+export default function ListaEvidencias() {
+  const navigation = useNavigation<NavigationProp<MainAppStackParamList>>();
+  const [evidencias, setEvidencias] = useState<Evidencia[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [evidenciaSelecionada, setEvidenciaSelecionada] = useState<Evidencia | null>(null);
-  const [descricaoEditada, setDescricaoEditada] = useState<string>('');
-  const [tipoEditado, setTipoEditado] = useState<string>('');
-  const [modoEdicao, setModoEdicao] = useState<boolean>(false);
+  const [selected, setSelected] = useState<Evidencia | null>(null);
+  const [descricaoEdit, setDescricaoEdit] = useState<string>('');
+  const [tipoEdit, setTipoEdit] = useState<string>('');
+  const [editMode, setEditMode] = useState<boolean>(false);
 
-  const abrirModal = (item: Evidencia) => {
-    setEvidenciaSelecionada(item);
-    setDescricaoEditada(item.descricao);
-    setTipoEditado(item.tipo);
-    setModoEdicao(false);
+  const fetchEvidencias = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await getEvidencias();
+      setEvidencias(list);
+    } catch (e: any) {
+      Alert.alert('Erro', e.message || 'Não foi possível carregar evidências');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Recarrega evidências sempre que a tela receber foco
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvidencias();
+    }, [fetchEvidencias])
+  );
+
+  const openModal = (item: Evidencia) => {
+    setSelected(item);
+    setDescricaoEdit(item.descricao);
+    setTipoEdit(item.tipo);
+    setEditMode(false);
     setModalVisible(true);
   };
 
-  const fecharModal = () => {
+  const closeModal = () => {
     setModalVisible(false);
-    setEvidenciaSelecionada(null);
-    setDescricaoEditada('');
-    setTipoEditado('');
-    setModoEdicao(false);
+    setSelected(null);
   };
 
-  const salvarEdicao = () => {
-    if (!evidenciaSelecionada) return;
-    setEvidencias((prev) =>
-      prev.map((ev) =>
-        ev.id === evidenciaSelecionada.id
-          ? { ...ev, descricao: descricaoEditada, tipo: tipoEditado }
-          : ev
-      )
-    );
-    setModoEdicao(false);
+  const saveEdit = async () => {
+    if (!selected) return;
+    try {
+      await updateEvidencia(selected._id, { descricao: descricaoEdit, tipo: tipoEdit });
+      setModalVisible(false);
+      fetchEvidencias();
+    } catch (e: any) {
+      Alert.alert('Erro', e.message || 'Falha ao atualizar');
+    }
   };
 
-  const excluirEvidencia = () => {
-    if (!evidenciaSelecionada) return;
+  const deleteItem = () => {
+    if (!selected) return;
     Alert.alert(
       'Excluir Evidência',
       'Tem certeza que deseja excluir esta evidência?',
@@ -85,11 +93,14 @@ export default function Evidencias() {
         {
           text: 'Excluir',
           style: 'destructive',
-          onPress: () => {
-            setEvidencias((prev) =>
-              prev.filter((ev) => ev.id !== evidenciaSelecionada.id)
-            );
-            fecharModal();
+          onPress: async () => {
+            try {
+              await deleteEvidencia(selected._id);
+              setModalVisible(false);
+              fetchEvidencias();
+            } catch (e: any) {
+              Alert.alert('Erro', e.message || 'Falha ao excluir');
+            }
           },
         },
       ]
@@ -97,8 +108,8 @@ export default function Evidencias() {
   };
 
   const renderItem = ({ item }: { item: Evidencia }) => (
-    <TouchableOpacity style={styles.itemContainer} onPress={() => abrirModal(item)}>
-      <Image source={{ uri: item.imagem }} style={styles.image} />
+    <TouchableOpacity style={styles.itemContainer} onPress={() => openModal(item)}>
+      <Image source={{ uri: item.imagemUrl }} style={styles.image} />
       <View style={styles.textContainer}>
         <Text style={styles.label}>
           <Text style={styles.bold}>Descrição:</Text> {item.descricao}
@@ -110,88 +121,92 @@ export default function Evidencias() {
           <Text style={styles.bold}>Data:</Text> {item.dataColeta}
         </Text>
         <Text style={styles.label}>
-          <Text style={styles.bold}>Responsável:</Text> {item.responsavel}
+          <Text style={styles.bold}>Responsável:</Text> {item.responsavelColeta}
         </Text>
       </View>
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
         data={evidencias}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 100 }}
       />
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => {}}
+        onPress={() => navigation.navigate('CadastroEvidencia')}
       >
         <Text style={styles.fabText}>+ Adicionar Evidência</Text>
       </TouchableOpacity>
 
-      {/* Modal detalhado */}
       <Modal visible={modalVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Image
-              source={{ uri: evidenciaSelecionada?.imagem }}
+              source={{ uri: selected?.imagemUrl }}
               style={styles.modalImage}
             />
 
-            {/* Descrição */}
             <View style={styles.fieldContainer}>
               <Text style={styles.modalLabel}>Descrição</Text>
               <TextInput
                 style={styles.input}
-                value={descricaoEditada}
-                onChangeText={setDescricaoEditada}
+                value={descricaoEdit}
+                onChangeText={setDescricaoEdit}
                 multiline
-                editable={modoEdicao}
+                editable={editMode}
                 placeholder="Digite a descrição da evidência"
               />
             </View>
 
-            {/* Tipo da Evidência */}
             <View style={styles.fieldContainer}>
               <Text style={styles.modalLabel}>Tipo da Evidência</Text>
               <TextInput
                 style={styles.input}
-                value={tipoEditado}
-                onChangeText={setTipoEditado}
-                editable={modoEdicao}
+                value={tipoEdit}
+                onChangeText={setTipoEdit}
+                editable={editMode}
                 placeholder="Ex: Fotográfica, Documental..."
               />
             </View>
 
-            {/* Somente leitura */}
             <View style={styles.readonlyContainer}>
               <Text style={styles.modalLabel}>Data da Coleta</Text>
-              <Text style={{ color: 'white' }}>{evidenciaSelecionada?.dataColeta}</Text>
+              <Text style={{ color: 'white' }}>{selected?.dataColeta}</Text>
             </View>
             <View style={styles.readonlyContainer}>
               <Text style={styles.modalLabel}>Responsável</Text>
-              <Text style={{ color: 'white' }}>{evidenciaSelecionada?.responsavel}</Text>
+              <Text style={{ color: 'white' }}>{selected?.responsavelColeta}</Text>
             </View>
 
             <View style={styles.modalButtons}>
-              {!modoEdicao ? (
-                <TouchableOpacity style={styles.editButton} onPress={() => {}}>
+              {!editMode ? (
+                <TouchableOpacity style={styles.editButton} onPress={() => setEditMode(true)}>
                   <Text style={styles.buttonText}>Editar</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.editButton} onPress={salvarEdicao}>
+                <TouchableOpacity style={styles.editButton} onPress={saveEdit}>
                   <Text style={styles.buttonText}>Salvar</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.deleteButton} onPress={excluirEvidencia}>
+              <TouchableOpacity style={styles.deleteButton} onPress={deleteItem}>
                 <Text style={styles.buttonText}>Excluir</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={fecharModal}>
+            <TouchableOpacity onPress={closeModal}>
               <Text style={styles.closeText}>Fechar</Text>
             </TouchableOpacity>
           </View>
@@ -207,10 +222,14 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#222831',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   itemContainer: {
     flexDirection: 'row',
     marginVertical: 8,
-    alignItems: 'flex-start',
     backgroundColor: '#393e46',
     borderRadius: 8,
     padding: 10,

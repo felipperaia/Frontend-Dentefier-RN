@@ -1,5 +1,5 @@
 // src/screens/MeusCasos.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, NavigationProp } from '@react-navigation/native';
+import { Platform } from 'react-native';
 import { MainTabParamList } from '../navigation/MainAppTabs';
 
 import { getMe, User as AuthUser } from '../services/auth';
@@ -29,8 +30,6 @@ export default function MeusCasos() {
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCaso, setSelectedCaso] = useState<ServiceCaso | null>(null);
 
@@ -49,7 +48,11 @@ export default function MeusCasos() {
     }
   }, []);
 
-  useEffect(() => { carregarDados(); }, [carregarDados]);
+  useFocusEffect(
+    useCallback(() => {
+      carregarDados();
+    }, [carregarDados])
+  );
 
   const casosFiltrados = casos.filter(c => {
     const matchStatus = statusFiltro === 'todos' || c.status === statusFiltro;
@@ -65,19 +68,6 @@ export default function MeusCasos() {
     setSelectedCaso(caso);
     setModalVisible(true);
   };
-
-  const renderItem = ({ item }: { item: ServiceCaso }) => (
-    <TouchableOpacity
-      style={styles.item}
-      onPress={() => openModal(item)}
-    >
-      <Text style={styles.title}>{item.titulo}</Text>
-      <Text style={styles.subtitle}>
-        #{item.numeroCaso} • {item.status} •{' '}
-        {new Date(item.dataAbertura).toLocaleDateString('pt-BR')}
-      </Text>
-    </TouchableOpacity>
-  );
 
   if (loading) {
     return (
@@ -96,10 +86,7 @@ export default function MeusCasos() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <Text style={styles.header}>Meus Casos</Text>
-
-      {/* Filtros fixos */}
       <View style={styles.filterBar}>
         <TextInput
           style={styles.input}
@@ -108,46 +95,58 @@ export default function MeusCasos() {
           value={busca}
           onChangeText={setBusca}
         />
-        <Picker
-          selectedValue={statusFiltro}
-          style={styles.picker}
-          onValueChange={setStatusFiltro}
-        >
-          <Picker.Item label="Todos os Status" value="todos" />
-          <Picker.Item label="Em andamento" value="Em andamento" />
-          <Picker.Item label="Finalizado" value="Finalizado" />
-          <Picker.Item label="Arquivado" value="Arquivado" />
-        </Picker>
-        <Picker
-          selectedValue={tipoFiltro}
-          style={styles.picker}
-          onValueChange={setTipoFiltro}
-        >
-          <Picker.Item label="Todos os Tipos" value="todos" />
-          <Picker.Item label="Odontologia Forense" value="Odontologia Forense" />
-          <Picker.Item label="Identificação Humana" value="Identificação Humana" />
-          <Picker.Item label="Exame Criminal" value="Exame Criminal" />
-          <Picker.Item label="Trauma" value="Trauma" />
-          <Picker.Item label="Estimativa de Idade" value="Estimativa de Idade" />
-          <Picker.Item label="Outro" value="Outro" />
-        </Picker>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={statusFiltro}
+            style={styles.picker}
+            dropdownIconColor="#222"
+            mode="dropdown"
+            onValueChange={setStatusFiltro}
+          >
+            <Picker.Item label="Todos os Status" value="todos" />
+            <Picker.Item label="Em andamento" value="Em andamento" />
+            <Picker.Item label="Finalizado" value="Finalizado" />
+            <Picker.Item label="Arquivado" value="Arquivado" />
+          </Picker>
+        </View>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={tipoFiltro}
+            style={styles.picker}
+            dropdownIconColor="#222"
+            mode="dropdown"
+            onValueChange={setTipoFiltro}
+          >
+            <Picker.Item label="Todos os Tipos" value="todos" />
+            <Picker.Item label="Odontologia Forense" value="Odontologia Forense" />
+            <Picker.Item label="Identificação Humana" value="Identificação Humana" />
+            <Picker.Item label="Exame Criminal" value="Exame Criminal" />
+            <Picker.Item label="Trauma" value="Trauma" />
+            <Picker.Item label="Estimativa de Idade" value="Estimativa de Idade" />
+            <Picker.Item label="Outro" value="Outro" />
+          </Picker>
+        </View>
       </View>
-
-      {/* Lista */}
       <FlatList
         contentContainerStyle={{ paddingBottom: 100 }}
         style={{ flex: 1 }}
         data={casosFiltrados}
         keyExtractor={item => item._id}
-        renderItem={renderItem}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={styles.item} onPress={() => openModal(item)}>
+            <Text style={styles.title}>{item.titulo}</Text>
+            <Text style={styles.subtitle}>
+              #{item.numeroCaso} • {item.status} •{' '}
+              {new Date(item.dataAbertura).toLocaleDateString('pt-BR')}
+            </Text>
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={() => (
           <View style={styles.center}>
             <Text>Nenhum caso encontrado.</Text>
           </View>
         )}
       />
-
-      {/* Novo Caso */}
       {user?.role !== 'assistente' && (
         <TouchableOpacity
           style={styles.addButton}
@@ -156,8 +155,6 @@ export default function MeusCasos() {
           <Text style={styles.addButtonText}>+ Novo Caso</Text>
         </TouchableOpacity>
       )}
-
-      {/* Modal de Detalhes */}
       <Modal
         visible={modalVisible}
         transparent
@@ -170,15 +167,6 @@ export default function MeusCasos() {
               <Text style={styles.modalTitle}>#{selectedCaso?.numeroCaso}</Text>
               <Text style={styles.modalLabel}>Título:</Text>
               <Text style={styles.modalText}>{selectedCaso?.titulo}</Text>
-              <Text style={styles.modalLabel}>Status:</Text>
-              <Text style={styles.modalText}>{selectedCaso?.status}</Text>
-              <Text style={styles.modalLabel}>Tipo:</Text>
-              <Text style={styles.modalText}>{selectedCaso?.contexto.tipoCaso}</Text>
-              <Text style={styles.modalLabel}>Abertura:</Text>
-              <Text style={styles.modalText}>
-                {selectedCaso && new Date(selectedCaso.dataAbertura).toLocaleDateString('pt-BR')}
-              </Text>
-              {/* acrescente aqui outros campos conforme seu modelo */}
             </ScrollView>
             <TouchableOpacity
               style={styles.closeButton}
@@ -211,11 +199,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginBottom: 8,
   },
-  picker: {
+  pickerContainer: {
     backgroundColor: '#eee',
-    height: 40,
+    borderRadius: 4,
     marginBottom: 8,
-    fontSize: 16,
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
+    color: '#000',
+    ...Platform.select({
+      android: { paddingHorizontal: 8 },
+    }),
   },
   item: {
     backgroundColor: '#fff',
