@@ -138,7 +138,7 @@ npm run ios
 
 ## 🔒 Fluxo de Autenticação
 
-![Fluxo de Autenticação](fluxo.png)
+![Fluxo de Autenticação](fluxo.jpg)
 
 ## 🤝 Contribuição
 
