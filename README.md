@@ -140,24 +140,6 @@ npm run ios
 
 ![Fluxo de Autenticação](fluxo.png)
 
-## 📱 Telas Principais
-
-### Home Screen
-![Dashboard](assets/home-screen.png)  
-*Resumo estatístico e gráficos de casos*
-
-### Gerenciamento de Casos
-![Casos](assets/casos-screen.png)  
-*Listagem e filtros de casos forenses*
-
-### Cadastro de Evidências
-![Evidências](assets/evidencias-screen.png)  
-*Upload e associação de evidências a casos*
-
-### Mapa de Localização
-![Mapa](assets/mapa-screen.png)  
-*Seleção de geolocalização para casos*0
-
 ## 🤝 Contribuição
 
 Contribuições são bem-vindas! Siga estes passos:
